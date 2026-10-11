@@ -1,0 +1,32 @@
+{
+  "name": "pocket-radio-web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": "^24.0.0"
+  },
+  "scripts": {
+    "dev": "wrangler pages dev dist --ip 127.0.0.1 --port 8788",
+    "dev:web": "vite --host 127.0.0.1",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.functions.json && tsc -p tsconfig.node.json",
+    "build": "vite build && wrangler pages functions build --outdir .wrangler/functions",
+    "deploy": "wrangler pages deploy dist"
+  },
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261011.1",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vitest": "5.0.3",
+    "wrangler": "4.149.0"
+  }
+}
