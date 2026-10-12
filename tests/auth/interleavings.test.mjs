@@ -1,18 +1,19 @@
 // Real handlers + ephemeral PostgreSQL/WASM; never a deployed database.
-// Install PGlite under a temporary prefix as in database.test.mjs, then:
-// node_modules/.bin/esbuild tests/auth/database-entry.ts --bundle --platform=node --format=esm --outfile=/tmp/auth-handlers.mjs
-// AUTH_HANDLERS_MODULE=/tmp/auth-handlers.mjs AUTH_PGLITE_MODULE=/absolute/path/to/pglite/dist/index.js node --test tests/auth/interleavings.test.mjs
+// Run with npm run test:db; optional module overrides support isolated investigation.
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { build } from "esbuild";
 
-if (!process.env.AUTH_PGLITE_MODULE || !process.env.AUTH_HANDLERS_MODULE) {
-  throw new Error("Set AUTH_PGLITE_MODULE and AUTH_HANDLERS_MODULE to temporary installations/bundles");
-}
-const { PGlite } = await import(pathToFileURL(process.env.AUTH_PGLITE_MODULE).href);
-const { createAuthHandlers, accessToken } = await import(pathToFileURL(process.env.AUTH_HANDLERS_MODULE).href);
+const { PGlite } = await import(process.env.AUTH_PGLITE_MODULE
+  ? pathToFileURL(process.env.AUTH_PGLITE_MODULE).href : "@electric-sql/pglite");
+const compiled = await build({ entryPoints: [new URL("./database-entry.ts", import.meta.url).pathname],
+  bundle: true, platform: "node", format: "esm", write: false });
+const { createAuthHandlers, accessToken } = await import(process.env.AUTH_HANDLERS_MODULE
+  ? pathToFileURL(process.env.AUTH_HANDLERS_MODULE).href
+  : `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
 const migration = await readFile(new URL("../../../supabase/migrations/20261011000008_web_auth.sql", import.meta.url), "utf8");
 const USER = "11111111-1111-4111-8111-111111111111";
 const ORIGIN = "https://radio.test";
