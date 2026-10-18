@@ -16,7 +16,7 @@
     "test:legacy-relay": "node workers/relay/local-smoke.mjs",
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.functions.json && tsc -p tsconfig.node.json && tsc -p tsconfig.ui-tests.json",
     "build": "vite build && wrangler pages functions build --outdir .wrangler/functions",
-    "deploy": "wrangler pages deploy dist"
+    "deploy": "wrangler pages deploy dist --project-name \"$PAGES_PROJECT\" --branch main"
   },
   "dependencies": {
     "qrcode": "1.5.4",
