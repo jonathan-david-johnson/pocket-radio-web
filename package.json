@@ -7,14 +7,15 @@
     "node": "^24.0.0"
   },
   "scripts": {
-    "dev": "wrangler pages dev dist -c wrangler.jsonc -c workers/relay/wrangler.toml --local --local-protocol https --ip 127.0.0.1 --port 8788",
+    "dev": "wrangler pages dev dist --local --local-protocol https --ip 127.0.0.1 --port 8788",
     "dev:web": "vite --host 127.0.0.1",
     "test": "vitest run && npm run test:db && npm run test:runtime",
     "test:unit": "vitest run",
     "test:db": "node --test tests/auth/database.test.mjs tests/auth/interleavings.test.mjs",
-    "test:runtime": "node workers/relay/local-smoke.mjs && node tests/pages-runtime.mjs",
+    "test:runtime": "node tests/pages-runtime.mjs",
+    "test:legacy-relay": "node workers/relay/local-smoke.mjs",
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.functions.json && tsc -p tsconfig.node.json && tsc -p tsconfig.ui-tests.json",
-    "build": "vite build && wrangler pages functions build --outdir .wrangler/functions && wrangler deploy --config workers/relay/wrangler.toml --dry-run --outdir .wrangler/relay",
+    "build": "vite build && wrangler pages functions build --outdir .wrangler/functions",
     "deploy": "wrangler pages deploy dist"
   },
   "dependencies": {

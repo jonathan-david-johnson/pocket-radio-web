@@ -1,11 +1,16 @@
 import { email, object, readJson, seconds, token, uuid, type AuthRuntime } from "./runtime";
 
-const BASE = "https://api.pocketcasts.com/";
+const API_BASES = {
+  production: "https://api.pocketcasts.com/",
+  staging: "https://api.pocketcasts.net/",
+};
 const ALLOWED_PATHS = new Set([
   "device/authorize", "user/token", "user/podcast/list", "user/podcast/episodes",
   "user/playlist/list", "user/named_settings/update",
 ]);
-export const SCOPE = "mobile";
+// Device grants use the iOS TV pairing scope, not the password-login scope.
+// Keep approval polling and refresh on the same scope (ADR 0003).
+export const SCOPE = "tv";
 
 // Source contract: iOS Api_TokenLoginResponse and AuthenticationResponse.
 // Protobuf JSON uses lowerCamelCase; servers may use the original snake_case
@@ -40,7 +45,9 @@ export async function pcRequest(runtime: AuthRuntime, path: string, body: unknow
   // Defense in depth: no sync writes, arbitrary URL, or arbitrary path even
   // if a future caller bypasses the probe handler's public allowlist.
   if (!ALLOWED_PATHS.has(path)) throw new Error("Unsupported upstream operation");
-  return runtime.fetch(BASE + path, {
+  const base = API_BASES[runtime.pcApiEnvironment ?? "production"];
+  if (!base) throw new Error("Invalid Pocket Casts environment");
+  return runtime.fetch(base + path, {
     method: "POST", redirect: "manual", signal: AbortSignal.timeout(10_000),
     headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "PocketRadio/1.0",
       ...(access ? { Authorization: `Bearer ${access}` } : {}),

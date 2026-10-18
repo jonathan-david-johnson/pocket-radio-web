@@ -2,23 +2,5 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "pocket-radio-web",
   "pages_build_output_dir": "./dist",
-  "compatibility_date": "2026-10-11",
-  "durable_objects": {
-    "bindings": [{
-      "name": "RELAY_HUB",
-      "class_name": "RelayHub",
-      "script_name": "pocket-radio-relay"
-    }]
-  },
-  "env": {
-    "preview": {
-      "durable_objects": {
-        "bindings": [{
-          "name": "RELAY_HUB",
-          "class_name": "RelayHub",
-          "script_name": "pocket-radio-relay"
-        }]
-      }
-    }
-  }
+  "compatibility_date": "2026-10-11"
 }

@@ -1,6 +1,7 @@
 import type { Env } from "../env";
 
 export interface AuthRuntime {
+  pcApiEnvironment?: "production" | "staging";
   now: () => number;
   random: () => string;
   hash: (value: string) => Promise<string>;
@@ -59,10 +60,16 @@ export async function readJson(response: Response, limit = 32_768): Promise<unkn
 }
 
 export function createRuntime(env: Env): AuthRuntime {
+  const pcApiEnvironment = env.PC_API_ENVIRONMENT ?? "production";
+  if (pcApiEnvironment !== "production" && pcApiEnvironment !== "staging") {
+    throw new Error("Invalid Pocket Casts environment");
+  }
   const fetchBounded: AuthRuntime["fetch"] = (input, init) => fetch(input, {
-    ...init, redirect: "manual", signal: AbortSignal.timeout(10_000),
+    ...init, redirect: "manual", signal: init?.signal
+      ? AbortSignal.any([init.signal, AbortSignal.timeout(10_000)]) : AbortSignal.timeout(10_000),
   });
   return {
+    pcApiEnvironment,
     now: () => Date.now(),
     random: () => {
       const bytes = crypto.getRandomValues(new Uint8Array(32));

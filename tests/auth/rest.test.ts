@@ -2,7 +2,8 @@ import { afterEach, expect, it, vi } from "vitest";
 import { requireSession } from "../../functions/_lib/auth/session";
 import { createRuntime, readJson } from "../../functions/_lib/auth/runtime";
 import type { Env } from "../../functions/_lib/env";
-import { cookies, digest, request, response, USER } from "./harness";
+import { accessToken, authorize, pcRequest, pollGrant } from "../../functions/_lib/auth/pocket-casts";
+import { authResponse, cookies, digest, grant, request, response, USER } from "./harness";
 
 const env: Env = { SUPABASE_URL: "https://database.test", SUPABASE_SERVICE_ROLE_KEY: "fixture-service-key" };
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
@@ -42,6 +43,34 @@ it("random handles are cryptographically generated opaque 256-bit identifiers an
   const generated = runtime.random();
   expect(/^[0-9a-f]{64}$/.test(generated)).toBe(true);
   expect((await runtime.hash(generated)) === digest(generated)).toBe(true);
+});
+it.each([undefined, "production", "staging"])("uses the selected Pocket Casts environment %s for authorization, polling, refresh and probes", async selected => {
+  const host = selected === "staging" ? "https://api.pocketcasts.net/" : "https://api.pocketcasts.com/";
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", async (url: string) => {
+    calls.push(url);
+    return response(url.endsWith("device/authorize") ? authResponse() : grant());
+  });
+  const runtime = createRuntime({ ...env, PC_API_ENVIRONMENT: selected });
+  runtime.rpc = async name => name === "web_token_claim"
+    ? { status: "refresh", user_uuid: USER, refresh_token: "fixture-refresh" } : true;
+  await authorize(runtime);
+  expect((await pollGrant(runtime, "fixture-device")).status).toBe("approved");
+  expect(await accessToken(runtime, digest(cookies.session))).toBe("fixture-access");
+  await pcRequest(runtime, "user/podcast/list", {}, "fixture-access");
+  expect(calls).toEqual([host + "device/authorize", host + "user/token", host + "user/token", host + "user/podcast/list"]);
+});
+it.each(["", "preview", "https://evil.test/", "STAGING"])("rejects invalid Pocket Casts environment %s without network access", selected => {
+  const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+  expect(() => createRuntime({ ...env, PC_API_ENVIRONMENT: selected })).toThrow("Invalid Pocket Casts environment");
+  expect(fetch).not.toHaveBeenCalled();
+});
+it("preserves caller cancellation as well as the runtime network deadline", async () => {
+  const abort = new AbortController(); let forwarded: AbortSignal | undefined;
+  vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => { forwarded = init.signal!; return response({}); });
+  await createRuntime(env).fetch("https://stream.example.org/metadata", { signal: abort.signal });
+  expect(forwarded?.aborted).toBe(false);
+  abort.abort(); expect(forwarded?.aborted).toBe(true);
 });
 it("limits JSON response size rather than buffering arbitrary upstream data", async () => {
   const result = response({ long: "x".repeat(64) });

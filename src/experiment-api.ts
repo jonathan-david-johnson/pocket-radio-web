@@ -1,13 +1,14 @@
+import { directStreamUrl, STATION_ID } from "../shared/direct-playback";
+
 export interface Pairing {
   userCode: string;
   pairingUri: string;
   expiresIn: number;
   interval: number;
 }
-export interface Relay {
-  relayId: string;
-  audioUrl: string;
-  eventsUrl: string;
+export interface Playback {
+  stationId: string;
+  streamUrl: string;
 }
 export type Session = { signedIn: false } | { signedIn: true; email: string };
 
@@ -25,13 +26,12 @@ export function pairingResponse(value: unknown): Pairing {
   }
   return data as unknown as Pairing;
 }
-export function relayResponse(value: unknown): Relay {
+export function playbackResponse(value: unknown, expectedStation: string, origin: string): Playback {
   const data = record(value);
-  if (typeof data.relayId !== "string" || !/^[a-f0-9]{64}$/.test(data.relayId) ||
-      data.audioUrl !== `/api/relay/${data.relayId}` || data.eventsUrl !== `/api/relay-events/${data.relayId}`) {
-    throw new Error("Invalid relay response");
-  }
-  return data as unknown as Relay;
+  if (!STATION_ID.test(expectedStation) || data.stationId !== expectedStation) throw new Error("Invalid station response");
+  const streamUrl = directStreamUrl(data.streamUrl);
+  if (new URL(streamUrl).origin === origin) throw new Error("Station audio must not use our application origin");
+  return { stationId: expectedStation, streamUrl };
 }
 export function sessionResponse(value: unknown): Session {
   const data = record(value);
@@ -48,7 +48,15 @@ export async function api(path: string, init: RequestInit = {}): Promise<{ data:
   const signal = init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000);
   // Browser fetch defaults to same-origin credentials; no cross-origin path is accepted.
   const response = await fetch(path, { ...init, redirect: "error", signal });
-  if (!response.ok) throw new Error(`Request failed (${response.status}). Check server bindings and the experiment notes.`);
+  if (!response.ok) {
+    const wait = retrySeconds(response.headers.get("Retry-After"), 30);
+    await response.body?.cancel();
+    if (response.status === 429) throw new Error(`Request rate limit (429). Wait ${wait} seconds before trying again.`);
+    if (response.status === 422 && path.startsWith("/api/playback?")) {
+      throw new Error("This station has no supported HTTPS stream. HTTP-only or unsafe addresses cannot play here; no relay is used.");
+    }
+    throw new Error(`Request failed (${response.status}). Check server bindings and the experiment notes.`);
+  }
   return { data: await response.json(), retryAfter: response.headers.get("Retry-After") };
 }
 export function post(body?: unknown): RequestInit {

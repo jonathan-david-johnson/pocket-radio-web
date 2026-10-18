@@ -1,6 +1,22 @@
-# Restricted relay Worker
+# Retired restricted relay Worker
+
+**Legacy offline source only.** [ADR 0006](../../../docs/web/adr/0006-direct-https-playback-without-an-audio-relay.md)
+replaced the relay with direct browser HTTPS playback. Normal build/dev/Pages
+configuration no longer uses this Worker or a DO binding. Browser relay routes
+now return 410; the contract below describes historical fixture behavior, not
+active HTTP routes. Do not deploy this Worker. `npm run test:legacy-relay` is
+an optional synthetic offline check. Existing tables/secrets were not deleted.
 
 This implements a local test of [Web ADR 0004](../../../docs/web/adr/0004-every-station-plays-through-the-stream-relay.md), not permission to redistribute audio. Pages authenticates browser requests and forwards them through `RELAY_HUB` to this Worker's SQLite Durable Object. Default public Worker ingress returns 404.
+
+**Live-use gate, reviewed 2026-10-15:** stop further SomaFM relay tests and do not
+deploy this host allowlist as a radio service. The
+[SomaFM terms](https://somafm.com/legal/tos.html) expressly restrict embedding and
+restreaming and do not approve new third-party clients. Cloudflare's continuous
+relay/proxy classification also remains unresolved. Offline synthetic tests may
+continue. See the [isolated deployment plan](../../../docs/web/experiments/2026-10-15_cloudflare_terms_and_deployment_plan.md):
+its first phase has no relay Worker or Pages relay binding. No running server
+configuration was changed by that review.
 
 ## Browser contract
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessToken, pcRequest, verifyGrant } from "../../functions/_lib/auth/pocket-casts";
+import { accessToken, pcRequest, pollGrant, verifyGrant } from "../../functions/_lib/auth/pocket-casts";
 import { cookie, SESSION_COOKIE } from "../../functions/_lib/auth/http";
 import { createSessionValidator } from "../../functions/_lib/auth/session";
 import { authResponse, cookies, digest, grant, harness, ORIGIN, OTHER, request, response, USER } from "./harness";
@@ -23,9 +23,19 @@ describe("pairing", () => {
     expect(secureCookies(result)).toBe(true);
     expect(h.rpcCalls.map(c => c.name)).toEqual(["web_pair_reserve", "web_pair_activate"]);
     expect(h.rpcCalls[0]!.args.p_browser_hash === cookies.browser).toBe(false);
-    expect(JSON.parse(String(h.fetchCalls[0]!.init!.body))).toEqual({ scope: "mobile" });
+    expect(JSON.parse(String(h.fetchCalls[0]!.init!.body))).toEqual({ scope: "tv" });
     expect(h.fetchCalls[0]!.init!.redirect).toBe("manual");
     expect(result.headers.get("Cache-Control")).toBe("no-store");
+  });
+  it.each(["device", "refresh"])("retains the TV device scope for the %s grant", async kind => {
+    const h = harness(); h.fetch(async () => response(grant()));
+    if (kind === "device") await pollGrant(h.runtime, "fixture-device");
+    else {
+      h.rpc(async name => name === "web_token_claim"
+        ? { status: "refresh", user_uuid: USER, refresh_token: "fixture-refresh" } : true);
+      expect(await accessToken(h.runtime, digest(cookies.session))).toBe("fixture-access");
+    }
+    expect(JSON.parse(String(h.fetchCalls[0]!.init!.body))).toMatchObject({ scope: "tv" });
   });
   it("reserves rate capacity before making upstream requests", async () => {
     const h = harness(); h.rpc(async () => false);

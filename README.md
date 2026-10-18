@@ -1,90 +1,123 @@
 # PocketRadio Web
 
-An M1 feasibility page built with Vite, React, and TypeScript. Cloudflare Pages
-serves the page and Functions on one origin. Supabase stores server-only secrets.
-A separate Worker exports the SQLite Durable Object that joins each listener's
-audio and title requests. See the [hosting decision](../docs/web/adr/0002-cloudflare-hosts-web-player-supabase-is-database.md).
+M1 feasibility page: Vite/React/TypeScript, same-origin Cloudflare Pages
+Functions, and server-only Supabase storage. Audio plays **directly from an
+HTTPS station to the browser**, not through our backend. No native helper is
+required. See [ADR 0006](../docs/web/adr/0006-direct-https-playback-without-an-audio-relay.md).
 
-Pairing, rolling sessions, both sign-outs, selected JSON probes, and a restricted
-stream relay are implemented and tested locally. **Live Pocket Casts JSON support,
-phone approval, production cookies, audio relay permission, and hour-long
-playback are not established.** This is not the M2–M7 player UI.
+The user verified local staging Pairing, email display/reload, both sign-outs
+and three read-only 200 / JSON-object probes. The previous relay listening
+check is historical. The user also reported direct playback after receiving
+Radio Paradise Global's UUID; cleanup and timed listening remain unverified.
+This is not the finished M2–M7 player or an installable PWA yet; installation
+is planned for M3. Nothing has been deployed.
 
 ## Local setup
 
 Use Node.js 24 and npm. Health and the page need no credentials.
 
 1. Run `npm ci`.
-2. Run `make test typecheck build`. Tests use synthetic upstreams and an
-   ephemeral PostgreSQL/WASM database; every runtime-test fetch is intercepted.
-3. Run `make dev`. Open `https://127.0.0.1:8788` and accept the local development
-   certificate. Secure session cookies require HTTPS; do not downgrade them.
+2. Run `make test typecheck build`. Tests use synthetic upstreams and ephemeral
+   PostgreSQL/WASM storage; no live credentials or stations are used.
+3. Run `make dev` and open `https://127.0.0.1:8788`. Accept the local development
+   certificate. Secure session cookies require HTTPS.
 4. Check `curl -k --fail https://127.0.0.1:8788/api/health`: `{"ok":true}`.
-   Stop the server with Ctrl-C. Changes require a rebuild/restart.
 
-`make dev-web` provides browser-only Vite hot reload, not Functions. `make dev`
-starts Pages and the relay Worker together. Authenticated experiments additionally
-need an approved database migration and server-only secrets; do not apply the
-migration or use live credentials merely to run the test suite.
+`make dev` starts Pages/Functions only, with no relay Worker or Durable Object.
+Stop with Ctrl-C. Changes require rebuild/restart. `make dev-web` is browser-only
+Vite hot reload without Functions.
 
 ## Commands and layout
 
-- `make test`: Vitest including UI regressions, isolated SQL contracts, offline
-  workerd Worker smoke, and separate Pages/DO integration with synthetic approval.
-- `make typecheck`: browser, Functions/Worker, configuration and UI tests.
-- `make build`: browser bundle, Functions bundle, relay Worker **dry run only**.
-  It uploads nothing. Outputs stay in ignored `dist/` and `.wrangler/`.
-- `make deploy`: verifies then deploys **Pages only**. It requires separate
-  approval and a previously deployed relay Worker. No deployment was performed.
+- `make test`: unit/UI and SQL contracts, then a real offline Pages runtime
+  checking synthetic Pairing, HTTPS station resolution, no server audio fetch,
+  HTTP rejection and retired relay routes. Some unit fixtures cover retained
+  legacy relay code; they are not evidence of an active relay.
+- `make typecheck`: browser, Functions, retained legacy fixtures and tests.
+- `make build`: browser and Functions bundles only. No Worker dry-run/deployment.
+- `npm run test:legacy-relay`: optional standalone offline historical DO check.
+- `make deploy`: uploads Pages after checks; **requires separate approval**, a
+  reviewed explicit target, private access and isolated secrets. Do not run it
+  merely because local tests pass.
 
-Browser code is in `src/`; Pages routes are under `functions/api/`; shared
-server helpers are in `functions/_lib/`. `workers/relay/` owns the separate
-Worker. Tests load the additive SQL migration from the sibling shell checkout.
-See [relay contracts and restrictions](workers/relay/README.md).
+Browser code is in `src/`, public security headers in `public/_headers`, shared
+initial-URL policy in `shared/direct-playback.ts`, and server helpers in
+`functions/_lib/`. `workers/relay/` is retained legacy source, not part of normal
+build/dev/deployment. No `RELAY_HUB` binding is configured.
 
-## Secrets and deployment prerequisites
+## Pairing and secrets
 
-Migration `../supabase/migrations/20261011000008_web_auth.sql` creates five
-service-role-only secret tables and their RPCs. Isolated tests apply it only to
-an ephemeral database. Production application is an explicit user checkpoint.
+For an approved authenticated local test, copy `.dev.vars.example` to ignored
+`.dev.vars`. Pages needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` only on the
+server. Never put credentials, tokens or user UUIDs in `VITE_` variables.
 
-For approved authenticated local experiments, copy `.dev.vars.example` to
-ignored `.dev.vars`, and `workers/relay/.dev.vars.example` to that Worker's
-ignored `.dev.vars`. Both runtimes need `SUPABASE_URL` and
-`SUPABASE_SERVICE_ROLE_KEY`. The migration's client-role grants are revoked;
-forged `x-user-uuid` requests should fail with permission denied, not expose rows.
+The web-only migration `../supabase/migrations/20261011000008_web_auth.sql` was
+applied to the linked PocketRadio project with approval on 2026-10-12. RLS and
+client privilege denial were verified. Existing relay tables/RPCs remain in
+that already-applied migration; no schema deletion or reapplication is needed
+for direct playback. The active playback path does not call relay RPCs.
 
-Production and preview Pages configurations bind `RELAY_HUB` to the
-`pocket-radio-relay` Worker, class `RelayHub`. After legal/rights/plan approval,
-deploy that Worker separately with its `workers/relay/wrangler.toml`, then
-configure server-only secrets in **both** the Worker and Pages project before
-using `make deploy`. Preview shares the configured relay Worker; isolate its
-namespace/credentials before untrusted preview access. Never run deployment
-commands without approval. CPU, quotas, billing and hour-long behavior still
-need production verification.
+Authorization, polling and refresh use the TV device scope, `tv`. The server-only
+`PC_API_ENVIRONMENT` selects `production` (default, `api.pocketcasts.com`) or
+`staging` (`api.pocketcasts.net`). All Pocket Casts requests use the same choice.
+The phone's `StagingDebug` build approves on `.net`; local `.dev.vars` therefore
+uses staging. A `.com` code was rejected there as expired/invalid grant.
 
-Never use `VITE_` variables for tokens, keys, session identifiers or `user_uuid`.
-The browser sees only approval codes, opaque relay handles, email after verified
-sign-in, and sanitized probe status. `.dev.vars*`, `.env*`, local Worker state,
-`node_modules/`, and build outputs are ignored; examples contain no real keys.
-Read [AGENTS.md](AGENTS.md) before changes.
+Secret tables are not environment-namespaced. Use separate databases for
+simultaneous `.net` and `.com` tests. Do not copy the shared project's service key
+into an untrusted preview, reset it, delete its sessions/tokens or switch its
+upstream environment without approval. The user approved private Free-only
+staging setup: Pages and a dedicated Free database named
+`pocket-radio-web-m1-staging` now exist, and only the web migration was applied.
+Privacy/Cloudflare-plan verification is pending; no app was uploaded or
+Cloudflare secrets installed. No billing or existing database changes are
+authorized. Follow the [staging checkpoint](../docs/web/experiments/2026-10-16_staging_deployment.md),
+not the root config's default deployment target.
 
-## Experiment page
+## Direct playback experiment
 
-- Start Pairing only after session restoration finishes. Scan the QR or use
-  the displayed code in the phone's approval screen. Cookie-renewing auth
-  transitions are serialized; stale UI-generation checks alone cannot prevent
-  a delayed `Set-Cookie` response.
-- Start a relay using a radio-browser station UUID, then press the audio
-  control's **Play** within 30 seconds. Only `ice1.somafm.com` and
-  `ice2.somafm.com` pass the spike's host allowlist. No curated-ID schema or
-  arbitrary Browse-host support is implemented. New playback needs a new handle.
-- Titles come from the listener's own audio connection. Receipt timestamps do
-  not measure alignment to the browser's audible buffer.
-- Run one JSON probe at a time. Podcast episodes need a podcast UUID.
-  `up_next/sync` and `sync/update_episode` stay manual/pending because they can
-  change account state. Output contains status/format, not private upstream data.
+1. Pair from the phone if the page is signed out.
+2. Enter a **radio-browser station UUID**, not a URL, for a permitted HTTPS
+   station. Click **Load HTTPS station**.
+3. Press **Play** on the native audio control. Test stop, another station, and
+   local sign-out. Titles and lyrics are intentionally unavailable.
 
-Mocks prove contracts and security behavior, not the upstream's acceptance of
-those contracts. Safari/Chrome, camera routing with both apps installed,
-redistribution rights and uninterrupted listening require external evidence.
+`GET /api/playback?stationId=<UUID>` requires a same-origin authenticated request.
+It queries the fixed radio-browser metadata endpoint with bounded time/body size
+and rejects lookup redirects. It returns only the ID and validated public HTTPS
+stream URL. It never GETs, HEADs or follows the audio stream. The browser validates
+the URL again, then assigns it to `<audio controls preload="none">`, without a
+CORS attribute, autoplay, ICY request or SSE subscription.
+
+HTTP-only streams show an unsupported message; no silent HTTPS rewrite or relay
+fallback occurs. Initial URLs with credentials, fragments, literal IPs,
+local/reserved hostnames or nondefault ports are rejected. Current support is
+public-looking DNS hosts on HTTPS/443, not all possible HTTPS station endpoints.
+DNS and subsequent browser redirects are not pinned by our server. The browser
+can still reject redirects, formats, codecs, network failures or station policy.
+
+Audio bypasses our server, so the station sees your IP and the browser controls
+third-party credentials. A no-referrer policy suppresses the app URL; no app
+cookies, Pocket Casts tokens or database secrets are attached by our code.
+Stop/error/switch/local sign-out/unmount pause and release the media source.
+Sign-out everywhere revokes web sessions, not a public URL already loaded in
+another browser. There is no relay lifetime or revocation timer to enforce.
+
+Legacy `/api/relay/*` and `/api/relay-events/*` entry routes return **410 Gone**
+without network or binding access. Do not redeploy the retired Worker. Direct
+playback is not a waiver of station/client terms: SomaFM's published third-party
+restrictions remain relevant, and no permission has been established here.
+
+## Read-only probes and remaining evidence
+
+Choose an endpoint and click **Run selected probe** once. Progress/errors/results
+appear below the button; wait the displayed delay after a 429. Results reveal
+format/status, not private subscriptions or playlists. Podcast episodes require
+a podcast UUID. `up_next/sync` and `sync/update_episode` stay manual/pending
+because they can change account state.
+
+Open checks include direct-playback cleanup and browser coverage, a timed HTTPS run,
+deployed Safari/Chrome cookies, account UUID comparison with iOS, live refresh,
+remaining endpoint schemas/permissions, and approved cloud isolation/plan choice.
+See [the active milestone](../docs/web/current_milestone.md) and
+[AGENTS.md](AGENTS.md). Do not claim live behavior from mocked tests.

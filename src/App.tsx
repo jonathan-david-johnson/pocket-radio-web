@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { api, pairingResponse, post, record, relayResponse, retrySeconds, sessionResponse,
-  type Pairing, type Relay, type Session } from "./experiment-api";
+import { api, pairingResponse, playbackResponse, post, record, retrySeconds, sessionResponse,
+  type Pairing, type Playback, type Session } from "./experiment-api";
 
 const message = (error: unknown) => error instanceof Error ? error.message : "Experiment unavailable";
 const PROBES = ["user/podcast/list", "user/podcast/episodes", "user/playlist/list", "user/named_settings", "up_next/sync", "sync/update_episode"];
@@ -14,8 +14,8 @@ export default function App() {
   // Serialize cookie-renewing restoration before any new auth transition.
   const [busy, setBusy] = useState(true);
   const [stationId, setStationId] = useState("");
-  const [relay, setRelay] = useState<Relay | null>(null);
-  const [title, setTitle] = useState("");
+  const [playback, setPlayback] = useState<Playback | null>(null);
+  const [playerStatus, setPlayerStatus] = useState("Choose a station with an HTTPS stream.");
   const [endpoint, setEndpoint] = useState(PROBES[0]!);
   const [podcastUuid, setPodcastUuid] = useState("");
   const [probe, setProbe] = useState("");
@@ -74,32 +74,11 @@ export default function App() {
   }, [pairing]);
 
   useEffect(() => {
-    setTitle("");
-    if (!relay) return;
     const player = audio.current;
-    let active = true;
-    const events = new EventSource(relay.eventsUrl);
-    events.addEventListener("reset", () => { if (active) setTitle(""); });
-    events.addEventListener("title", event => {
-      if (!active) return;
-      try {
-        const data = record(JSON.parse((event as MessageEvent<string>).data));
-        if (typeof data.title === "string") setTitle(data.title);
-      } catch { setTitle(""); }
-    });
-    events.addEventListener("stopped", () => { if (active) { events.close(); setRelay(null); setTitle(""); } });
-    events.onerror = () => {
-      if (!active) return;
-      events.close(); setTitle(""); setRelay(null);
-      setStatus("Relay events ended. Start a new relay; do not reuse the old audio URL.");
-    };
     return () => {
-      active = false;
-      events.close();
       if (player) { player.pause(); player.removeAttribute("src"); player.load(); }
-      void api(`/api/relay/${relay.relayId}/stop`, { ...post(), keepalive: true }).catch(() => {});
     };
-  }, [relay]);
+  }, [playback]);
 
   async function startPairing() {
     if (busy) return;
@@ -114,32 +93,37 @@ export default function App() {
   }
   async function signout(everywhere: boolean) {
     if (busy) return;
-    ++generation.current; setPairing(null); setRelay(null); setTitle(""); setBusy(true);
+    ++generation.current; setPairing(null); setPlayback(null); setPlayerStatus("Playback stopped."); setBusy(true);
     try {
       await api(everywhere ? "/api/signout/everywhere" : "/api/signout", post());
       setSession({ signedIn: false }); setProbe(""); setStatus(everywhere ? "All web sessions signed out." : "Signed out.");
     } catch (error) { setStatus(message(error)); }
     finally { setBusy(false); }
   }
-  async function startRelay() {
-    if (busy) return;
-    setBusy(true); setRelay(null);
+  async function loadStation() {
+    if (busy || !session.signedIn) return;
+    const epoch = ++generation.current;
+    const id = stationId.trim().toLowerCase();
+    setBusy(true); setPlayback(null); setPlayerStatus("Looking up HTTPS station…");
     try {
-      const result = await api("/api/relay/start", post({ stationId: stationId.trim() }));
-      setRelay(relayResponse(result.data));
-      setStatus("Press Play within 30 seconds. Titles are receipt-time observations, not measured audio alignment.");
-    } catch (error) { setStatus(message(error)); }
-    finally { setBusy(false); }
+      const result = await api(`/api/playback?${new URLSearchParams({ stationId: id })}`);
+      if (epoch !== generation.current) return;
+      setPlayback(playbackResponse(result.data, id, window.location.origin));
+      setPlayerStatus("HTTPS stream ready. Press Play to connect directly to the station.");
+    } catch (error) { if (epoch === generation.current) setPlayerStatus(message(error)); }
+    finally { if (epoch === generation.current) setBusy(false); }
   }
   async function runProbe() {
     if (busy) return;
-    setBusy(true); setProbe("");
+    setBusy(true); setProbe(`Running ${endpoint}…`);
     try {
       const params = new URLSearchParams({ endpoint });
       if (endpoint === "user/podcast/episodes") params.set("podcastUuid", podcastUuid.trim());
       const result = await api(`/api/probes?${params}`);
       setProbe(JSON.stringify(result.data, null, 2));
-    } catch (error) { setStatus(message(error)); }
+    } catch (error) {
+      setProbe(message(error)); setStatus(message(error));
+    }
     finally { setBusy(false); }
   }
 
@@ -147,7 +131,7 @@ export default function App() {
     <main>
       <h1>PocketRadio Web</h1>
       <p>M1 feasibility page — not the finished player.</p>
-      <aside>Local tests are not live approval, deployment, or playback evidence. Production audio needs Cloudflare terms and station-rights clearance. This spike permits only two SomaFM hosts, not arbitrary Browse results.</aside>
+      <aside>Direct HTTPS playback: audio goes from the station to your browser, not through our server. HTTP-only streams and ICY track titles are unavailable. Local tests do not prove live browser playback, deployment or permission to use a station. Installable app support is planned for M3.</aside>
       <p role="status" aria-live="polite">{status}</p>
       <section aria-labelledby="pairing-heading">
         <h2 id="pairing-heading">Pairing and session</h2>
@@ -162,24 +146,31 @@ export default function App() {
           <button disabled={busy || !session.signedIn} onClick={() => void signout(true)}>Sign out everywhere</button>
         </div>
       </section>
-      <section aria-labelledby="relay-heading">
-        <h2 id="relay-heading">Stream relay</h2>
+      <section aria-labelledby="playback-heading">
+        <h2 id="playback-heading">Direct playback</h2>
         <label>Radio-browser station UUID<input value={stationId} onChange={event => setStationId(event.target.value)} placeholder="Station ID, never a URL" /></label>
-        <p>Choose an HTTP or HTTPS MP3 station on <code>ice1.somafm.com</code> or <code>ice2.somafm.com</code>. A public station URL does not establish relay permission.</p>
-        <button disabled={busy || !session.signedIn || !stationId.trim()} onClick={() => void startRelay()}>Start relay experiment</button>
-        {relay && <div>
-          <audio ref={audio} src={relay.audioUrl} controls preload="none" onError={() => { setRelay(null); setStatus("Audio failed. Start a new relay."); }} />
-          <button onClick={() => setRelay(null)}>Stop relay</button>
+        <p>Choose a permitted HTTPS station. Your browser connects to its public stream and reveals your IP to the station. We do not upgrade HTTP URLs or use an audio fallback relay.</p>
+        <button disabled={busy || !session.signedIn || !stationId.trim()} onClick={() => void loadStation()}>Load HTTPS station</button>
+        <p role="status" aria-live="polite">{playerStatus}</p>
+        {playback && <div>
+          <audio key={playback.stationId + playback.streamUrl} ref={audio} src={playback.streamUrl} controls preload="none"
+            onPlay={event => { if (event.currentTarget === audio.current) setPlayerStatus("Playing directly from the station."); }}
+            onError={event => {
+              if (event.currentTarget !== audio.current) return;
+              setPlayback(null); setPlayerStatus("The browser could not play this stream. It may be offline, redirect to HTTP, or use an unsupported format. No relay fallback was attempted.");
+            }} />
+          <button disabled={busy} onClick={() => { setPlayback(null); setPlayerStatus("Playback stopped."); }}>Stop playback</button>
         </div>}
-        <p aria-live="polite">Track title: {title || "No current title"}</p>
+        <p>Track titles are unavailable in direct playback. No station metadata feed or lyrics source is connected.</p>
       </section>
       <section aria-labelledby="probes-heading">
         <h2 id="probes-heading">Pocket Casts JSON probes</h2>
         <label>Endpoint<select value={endpoint} onChange={event => setEndpoint(event.target.value)}>{PROBES.map(path => <option key={path}>{path}</option>)}</select></label>
         {endpoint === "user/podcast/episodes" && <label>Podcast UUID<input value={podcastUuid} onChange={event => setPodcastUuid(event.target.value)} /></label>}
         <button disabled={busy || !session.signedIn} onClick={() => void runProbe()}>Run selected probe</button>
-        <p>Write-capable endpoints remain manual and pending. Results show format/status only, not private upstream data. Server probes are limited to one per 30 seconds.</p>
-        {probe && <pre>{probe}</pre>}
+        {!session.signedIn && <p>Pair first to enable probes.</p>}
+        <p>Choose an endpoint, then click Run selected probe. Results show format/status only, not your podcast or playlist contents. Server probes are limited to one per 30 seconds. Write-capable endpoints remain manual and pending.</p>
+        <pre role="status" aria-live="polite">{probe || "No probe run yet."}</pre>
       </section>
     </main>
   );
