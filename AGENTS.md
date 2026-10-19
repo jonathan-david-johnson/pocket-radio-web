@@ -10,8 +10,8 @@ Read `../AGENTS.md`, `../docs/web/current_milestone.md`, and
 
 ## Work and verification
 
-- Bootstrap on `main`, then implement M1 on `feature/m1-spikes`. Keep the
-  shell on `main`. See the milestone's location table and subagent plan.
+- Work on the branch named in the active milestone's location table, in
+  `docs/web/current_milestone.md`. Keep the shell on `main`.
 - Each platform command lives in this repo's Makefile. Shell `web-*` targets
   only delegate. Run `make test`, `make typecheck`, and `make build` before
   committing. Test function behavior with injected upstream fetch/storage
@@ -56,7 +56,7 @@ Read `../AGENTS.md`, `../docs/web/current_milestone.md`, and
 
 ## Evidence and external actions
 
-Record M1 results under `../docs/web/experiments/`, with sanitized evidence.
+Record experiment results under `../docs/web/experiments/`, with sanitized evidence. Durable results move to `../docs/web/architecture/` and the ADRs when the milestone closes.
 Mocks and local runtime tests prove implementation behavior, not phone
 approval, production cookie behavior, Cloudflare terms, or an hour of playback.
 Keep unavailable checks explicitly pending. The user performs phone gestures

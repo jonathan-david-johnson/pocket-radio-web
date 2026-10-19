@@ -67,11 +67,9 @@ Secret tables are not environment-namespaced. Use separate databases for
 simultaneous `.net` and `.com` tests. Do not copy the shared project's service key
 into an untrusted preview, reset it, delete its sessions/tokens or switch its
 upstream environment without approval. The user approved private Free-only
-staging setup: Pages and a dedicated Free database named
-`pocket-radio-web-m1-staging` now exist, and only the web migration was applied.
-Privacy/Cloudflare-plan verification is pending; no app was uploaded or
-Cloudflare secrets installed. No billing or existing database changes are
-authorized. Follow the [staging checkpoint](../docs/web/experiments/2026-10-16_staging_deployment.md),
+staging setup: a Pages project and a dedicated Free database, both named
+`pocket-radio-web-m1-staging`, exist and are deployed behind Cloudflare Access.
+No billing or existing database changes are authorized. Follow the [deployment guide](../docs/web/architecture/deployment.md),
 not the root config's default deployment target.
 
 ## Direct playback experiment
