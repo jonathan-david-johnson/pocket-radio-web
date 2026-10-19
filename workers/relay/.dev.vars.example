@@ -1,4 +1,0 @@
-# Separate Worker secret store; never use real values in this example.
-# Copy to ignored workers/relay/.dev.vars for approved authenticated local tests.
-# SUPABASE_URL=https://your-project.supabase.co
-# SUPABASE_SERVICE_ROLE_KEY=replace-with-server-only-service-role-key
