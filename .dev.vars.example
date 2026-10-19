@@ -2,6 +2,8 @@
 # Copy to ignored .dev.vars only for approved authenticated local experiments.
 # SUPABASE_URL=https://your-project.supabase.co
 # SUPABASE_SERVICE_ROLE_KEY=replace-with-server-only-service-role-key
+# Anon key for shared tables such as nav_layout (ADR 0002). Server-only; never in the bundle.
+# SUPABASE_ANON_KEY=replace-with-anon-key
 # Optional: production (default, .com) or staging (.net). Must match the phone.
 # PC_API_ENVIRONMENT=production
 # Use separate databases for concurrent production/staging sessions.
