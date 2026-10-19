@@ -9,7 +9,15 @@ body {
 }
 
 main {
-  max-width: 42rem;
-  margin: 4rem auto;
+  max-width: 48rem;
+  margin: 3rem auto;
   padding: 0 1.5rem;
 }
+section { border-top: 1px solid #888; padding: 1rem 0; }
+aside { border-left: 4px solid #b80; padding: 0.75rem; }
+label { display: block; margin: 0.75rem 0; }
+input, select { display: block; box-sizing: border-box; width: 100%; padding: 0.5rem; }
+button { padding: 0.5rem 0.75rem; margin: 0.25rem 0.5rem 0.25rem 0; }
+audio { display: block; margin: 1rem 0; width: 100%; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+img { background: white; }

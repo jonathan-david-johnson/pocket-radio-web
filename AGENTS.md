@@ -37,12 +37,20 @@ Read `../AGENTS.md`, `../docs/web/current_milestone.md`, and
 - Pairing needs an expiring browser-bound opaque handle, not a device code
   exposed in a poll URL. Tokens remain server-side. Protect mutating routes
   against cross-origin requests, and bound polling and upstream work.
-- Relay routes accept station IDs, never client-supplied URLs. Resolve URLs
-  server-side. Reject private/local addresses, credentials, unsafe schemes,
-  and unsafe redirects. Authenticate audio and title subscriptions.
-- Titles must come from the listener's own relay connection. A second
-  connection cannot supply title evidence. Do not assume in-memory state
-  crosses Worker isolates; use an explicit deployment-supported channel.
+- Direct playback uses a station ID, never a client-supplied URL. Authenticate
+  and bound the fixed radio-browser metadata lookup; return a validated public
+  HTTPS URL. The backend must not GET, HEAD, follow or forward station audio.
+  Validate the initial URL in the browser too; reject HTTP-only/unsafe inputs
+  without a fallback. DNS and browser redirects are not server-pinned.
+- The audio element connects to the station. Keep tokens/app cookies out of
+  station request headers and suppress the app referrer. Stop/remove/load the
+  media source on stop, switch, local sign-out, failure and unmount.
+- Old relay routes return 410 without network/binding work; normal Pages
+  config/build/dev must have no relay Worker or DO dependency (ADR 0006).
+  Existing relay source/tests are legacy offline fixtures, not a live feature.
+- No generic ICY titles or lyrics are available. Do not open a second audio
+  stream for metadata or claim a future feed observes the listener's timeline.
+  Do not claim station-client rights merely because playback is direct.
 
 ## Evidence and external actions
 

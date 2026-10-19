@@ -1,5 +1,7 @@
-# No environment variables or secrets are needed for the placeholder or /api/health.
-# Future server-only values; uncomment and replace only after server wiring exists.
+# Server-only placeholders. Health and hermetic tests need none of these.
+# Copy to ignored .dev.vars only for approved authenticated local experiments.
 # SUPABASE_URL=https://your-project.supabase.co
-# SUPABASE_ANON_KEY=replace-with-server-only-anon-key
 # SUPABASE_SERVICE_ROLE_KEY=replace-with-server-only-service-role-key
+# Optional: production (default, .com) or staging (.net). Must match the phone.
+# PC_API_ENVIRONMENT=production
+# Use separate databases for concurrent production/staging sessions.

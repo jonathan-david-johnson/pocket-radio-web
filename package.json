@@ -7,23 +7,34 @@
     "node": "^24.0.0"
   },
   "scripts": {
-    "dev": "wrangler pages dev dist --ip 127.0.0.1 --port 8788",
+    "dev": "wrangler pages dev dist --local --local-protocol https --ip 127.0.0.1 --port 8788",
     "dev:web": "vite --host 127.0.0.1",
-    "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.functions.json && tsc -p tsconfig.node.json",
+    "test": "vitest run && npm run test:db && npm run test:runtime",
+    "test:unit": "vitest run",
+    "test:db": "node --test tests/auth/database.test.mjs tests/auth/interleavings.test.mjs",
+    "test:runtime": "node tests/pages-runtime.mjs",
+    "test:legacy-relay": "node workers/relay/local-smoke.mjs",
+    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.functions.json && tsc -p tsconfig.node.json && tsc -p tsconfig.ui-tests.json",
     "build": "vite build && wrangler pages functions build --outdir .wrangler/functions",
-    "deploy": "wrangler pages deploy dist"
+    "deploy": "wrangler pages deploy dist --project-name \"$PAGES_PROJECT\" --branch main"
   },
   "dependencies": {
+    "qrcode": "1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261011.1",
+    "@electric-sql/pglite": "0.5.8",
+    "@testing-library/react": "16.3.3",
     "@types/node": "24.19.2",
+    "@types/qrcode": "1.5.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
+    "esbuild": "0.28.2",
+    "jsdom": "30.1.2",
+    "miniflare": "5.20261006.1-alpha",
     "typescript": "7.0.2",
     "vite": "8.3.4",
     "vitest": "5.0.3",
