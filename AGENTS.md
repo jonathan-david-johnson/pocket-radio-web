@@ -47,7 +47,9 @@ Read `../AGENTS.md`, `../docs/web/current_milestone.md`, and
   media source on stop, switch, local sign-out, failure and unmount.
 - Old relay routes return 410 without network/binding work; normal Pages
   config/build/dev must have no relay Worker or DO dependency (ADR 0006).
-  Existing relay source/tests are legacy offline fixtures, not a live feature.
+  The relay Worker, its source and its tests were deleted after web M1; only
+  the 410 tombstone routes remain. The relay's SQL tables and RPCs are still in
+  the applied migration.
 - No generic ICY titles or lyrics are available. Do not open a second audio
   stream for metadata or claim a future feed observes the listener's timeline.
   Do not claim station-client rights merely because playback is direct.
