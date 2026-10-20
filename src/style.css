@@ -21,3 +21,17 @@ button { padding: 0.5rem 0.75rem; margin: 0.25rem 0.5rem 0.25rem 0; }
 audio { display: block; margin: 1rem 0; width: 100%; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 img { background: white; }
+
+/* App shell */
+.shell { display: grid; grid-template-columns: 14rem 1fr; min-height: 100vh; }
+.shell-narrow { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+.shell-main { padding: 1rem 1.5rem; }
+.sidebar { border-right: 1px solid #888; padding: 1rem 0; }
+.sidebar ul, .tabbar ul { list-style: none; margin: 0; padding: 0; }
+.sidebar a { display: block; padding: 0.5rem 1rem; text-decoration: none; color: inherit; }
+.sidebar a[aria-current="page"], .tabbar a[aria-current="page"] { font-weight: 700; }
+.bar-line { border: 0; border-top: 1px solid #888; margin: 0.5rem 1rem; }
+.tabbar { position: sticky; bottom: 0; border-top: 1px solid #888; background: Canvas; }
+.tabbar ul { display: flex; justify-content: space-around; }
+.tabbar a { display: block; padding: 0.75rem 0.5rem; text-decoration: none; color: inherit; }
+.account { display: flex; gap: 0.5rem; align-items: center; justify-content: flex-end; border: 0; padding: 0; }

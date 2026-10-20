@@ -20,7 +20,8 @@
   "dependencies": {
     "qrcode": "1.5.4",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "react-router": "8.5.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261011.1",

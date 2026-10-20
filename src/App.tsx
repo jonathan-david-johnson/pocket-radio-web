@@ -6,8 +6,9 @@ import { api, pairingResponse, playbackResponse, post, record, retrySeconds, ses
 const message = (error: unknown) => error instanceof Error ? error.message : "Experiment unavailable";
 const PROBES = ["user/podcast/list", "user/podcast/episodes", "user/playlist/list", "user/named_settings", "up_next/sync", "sync/update_episode"];
 
-export default function App() {
-  const [session, setSession] = useState<Session>({ signedIn: false });
+export default function App({ onSessionChange }: { onSessionChange?: (session: Session) => void } = {}) {
+  const [session, setSessionState] = useState<Session>({ signedIn: false });
+  const setSession = (next: Session) => { setSessionState(next); onSessionChange?.(next); };
   const [pairing, setPairing] = useState<Pairing | null>(null);
   const [qr, setQr] = useState("");
   const [status, setStatus] = useState("Checking session…");
