@@ -52,6 +52,13 @@ describe("wide window: Sidebar", () => {
     expect(screen.queryByRole("navigation", { name: "Tabs" })).toBeNull();
   });
 
+  it("shows the default Destinations when the stored Layout is empty", async () => {
+    mount("/", { slots: [] });
+    const sidebar = await screen.findByRole("navigation", { name: "Destinations" });
+    expect(names(sidebar)).toEqual(["Podcasts", "Streams", "Playlists", "Discover", "Profile", "Up Next"]);
+    expect((await screen.findByRole("heading", { level: 1 })).textContent).toBe("Podcasts");
+  });
+
   it("shows a loaded playlist's name instead of a generic label", async () => {
     mount("/streams", { playlists: new Map([[PL_A, "New Releases"]]) });
     expect(names(await screen.findByRole("navigation", { name: "Destinations" }))).toContain("New Releases");

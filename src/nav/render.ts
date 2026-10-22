@@ -11,6 +11,13 @@ export const CORE_DESTINATIONS = ["podcasts", "playlists", "discover", "streams"
 
 export type CoreDestination = (typeof CORE_DESTINATIONS)[number];
 
+/**
+ * What shows when no slot is left to render, so the bar is never empty: the
+ * Pocket Casts web menu's top group with Streams after Podcasts. Not iOS
+ * behavior; see `contracts/nav_layout/README.md`.
+ */
+export const EMPTY_LAYOUT_DEFAULT: readonly CoreDestination[] = ["podcasts", "streams", "playlists", "discover"];
+
 const PLAYLIST_PREFIX = "playlist:";
 
 /** A destination as stored in `nav_layout.slots`: a core id or `playlist:<uuid>`. */
@@ -47,6 +54,7 @@ export function resolveDestination(id: string): DestinationId | null {
  * `isPlaylistAvailable` says whether a playlist still exists for the user. A slot
  * for a missing playlist is dropped, as iOS does with `isAvailable`, rather than
  * shown as a dead tab. Unknown ids are dropped too. The rest keep their order.
+ * When none is left, `EMPTY_LAYOUT_DEFAULT` renders instead.
  */
 export function renderLayout(
   slots: readonly string[],
@@ -55,7 +63,7 @@ export function renderLayout(
 ): RenderPlan {
   const cap = Math.max(1, Math.floor(capacity));
 
-  const resolvable: DestinationId[] = [];
+  let resolvable: DestinationId[] = [];
   for (const slot of slots) {
     const destination = resolveDestination(slot);
     if (destination === null) continue;
@@ -63,6 +71,7 @@ export function renderLayout(
     if (uuid !== null && !isPlaylistAvailable(uuid)) continue;
     resolvable.push(destination);
   }
+  if (resolvable.length === 0) resolvable = [...EMPTY_LAYOUT_DEFAULT];
 
   const placed = new Set<string>(resolvable);
   const complement = CORE_DESTINATIONS.filter((core) => !placed.has(core));
