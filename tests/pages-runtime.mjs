@@ -55,7 +55,7 @@ const outboundService = async request => {
   }
   throw new Error("Unexpected outbound request: audio and live network are forbidden");
 };
-const bindings = { SUPABASE_URL: "https://database.test", SUPABASE_SERVICE_ROLE_KEY: "synthetic-service-key" };
+const bindings = { SUPABASE_URL: "https://database.test", SUPABASE_SERVICE_ROLE_KEY: "synthetic-service-key", SUPABASE_ANON_KEY: "synthetic-anon-key" };
 const runtime = new Miniflare(convertV4MiniflareOptions({
   host: "127.0.0.1", port: 0,
   workers: [{ name: "web", modules: true, script: await readFile(".wrangler/functions/index.js", "utf8"),
@@ -81,6 +81,9 @@ try {
   assert.deepEqual(await (await call("/api/session")).json(), { signedIn: false });
   assert.equal((await call(`/api/playback?stationId=${station}`)).status, 401);
   assert.equal(stationLookups, 0);
+  const signedOut = outboundCalls;
+  for (const path of ["/api/layout", "/api/stations/curated"]) assert.equal((await call(path)).status, 401);
+  assert.equal(outboundCalls, signedOut, "Signed-out shared-table routes must not reach the database");
   const start = await call("/api/pair/start", "POST");
   assert.equal(start.status, 200);
   assert.deepEqual(await start.json(), { userCode: "ABCDEF", pairingUri: "pktc://pair?user_code=ABCDEF", expiresIn: 600, interval: 5 });
@@ -108,8 +111,11 @@ try {
   assert.equal((await call("/api/signout/everywhere", "POST")).status, 200);
   assert.deepEqual(await (await call("/api/session")).json(), { signedIn: false });
   assert.equal((await call(`/api/playback?stationId=${station}`)).status, 401);
+  const signedOutAgain = outboundCalls;
+  for (const path of ["/api/layout", "/api/stations/curated"]) assert.equal((await call(path)).status, 401);
+  assert.equal(outboundCalls, signedOutAgain, "Signed-out shared-table routes must not reach the database");
   assert.equal((await db.query("select count(*)::int as n from public.pc_tokens")).rows[0].n, 0);
-  console.log("Local Pages: synthetic pairing/reload/signout, HTTPS-only station resolution, no audio fetch/DO binding, input rejection and 410 relay tombstones passed; no live network or browser playback.");
+  console.log("Local Pages: synthetic pairing/reload/signout, HTTPS-only station resolution, no audio fetch/DO binding, input rejection, signed-out 401 on shared-table routes and 410 relay tombstones passed; no live network or browser playback.");
 } finally {
   clearTimeout(deadline);
   await runtime.dispose();
