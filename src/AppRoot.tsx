@@ -26,7 +26,7 @@ export default function AppRoot() {
       <Route path="/experiments" element={<App onSessionChange={setSession} />} />
       <Route
         path="*"
-        element={<Shell email={session.email} playlists={null} onSignedOut={() => setSession({ signedIn: false })} />}
+        element={<Shell email={session.email} onSignedOut={() => setSession({ signedIn: false })} />}
       />
     </Routes>
   );

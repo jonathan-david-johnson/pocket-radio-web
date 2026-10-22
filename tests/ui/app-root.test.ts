@@ -12,6 +12,7 @@ function network(session: unknown) {
   return vi.fn(async (url: string) => {
     if (url === "/api/session") return new Response(JSON.stringify(session));
     if (url === "/api/layout") return new Response(JSON.stringify({ slots: ["podcasts", "streams"], updated_at: "2026-10-01T00:00:00+00:00" }));
+    if (url === "/api/playlists") return new Response(JSON.stringify({ playlists: [] }));
     throw new Error(`Unexpected ${url}`);
   });
 }

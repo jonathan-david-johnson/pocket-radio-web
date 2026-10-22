@@ -4,17 +4,17 @@ import { api, post } from "../experiment-api";
 import { renderLayout, type DestinationId } from "../nav/render";
 import { isPlaylistAvailable, labelFor, MORE_PATH, pathFor, TAB_CAPACITY, type PlaylistNames } from "./destinations";
 import { useLayout } from "./useLayout";
+import { usePlaylists } from "./usePlaylists";
 import { useNarrow } from "./useNarrow";
 
 interface ShellProps {
   email: string;
-  /** Playlist names by UUID once loaded, or `null` until then. */
-  playlists: PlaylistNames;
   onSignedOut: () => void;
 }
 
-export default function Shell({ email, playlists, onSignedOut }: ShellProps) {
+export default function Shell({ email, onSignedOut }: ShellProps) {
   const layout = useLayout();
+  const playlists = usePlaylists(layout.slots);
   const narrow = useNarrow();
   const plan = useMemo(
     () => (layout.slots ? renderLayout(layout.slots, TAB_CAPACITY, uuid => isPlaylistAvailable(playlists, uuid)) : null),
@@ -105,7 +105,7 @@ function PlaylistScreen({ playlists }: { playlists: PlaylistNames }) {
   if (playlists !== null && !playlists.has(uuid)) {
     return <section><h1>Playlist</h1><p>This playlist isn't available</p></section>;
   }
-  const title = playlists?.get(uuid) ?? "Playlist";
+  const title = playlists?.get(uuid) || "Playlist";
   return <Placeholder title={title} />;
 }
 

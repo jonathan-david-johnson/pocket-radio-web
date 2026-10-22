@@ -29,7 +29,7 @@ export function coreLabel(id: CoreDestination): string {
 export function labelFor(id: DestinationId, playlists: PlaylistNames): string {
   const uuid = playlistUuid(id);
   if (uuid === null) return CORE[id as CoreDestination].label;
-  return playlists?.get(uuid) ?? "Playlist";
+  return playlists?.get(uuid) || "Playlist";
 }
 
 /** Before playlists load, every playlist slot is assumed to exist. */

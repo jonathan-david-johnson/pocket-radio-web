@@ -17,15 +17,29 @@ function viewport(narrow: boolean) {
 function mount(path: string, opts: { narrow?: boolean; playlists?: ReadonlyMap<string, string> | null; slots?: string[] } = {}) {
   viewport(opts.narrow ?? false);
   let slots = opts.slots ?? ["podcasts", "streams", `playlist:${PL_A}`];
-  const network = vi.fn(async () => layout(...slots));
+  // null: /api/playlists fails, so the shell has no playlist list.
+  let playlists = opts.playlists ?? null;
+  const network = vi.fn(async (url: string) => {
+    if (url === "/api/layout") return layout(...slots);
+    if (url === "/api/playlists") {
+      if (playlists === null) return new Response("no", { status: 502 });
+      return new Response(JSON.stringify({ playlists: [...playlists].map(([uuid, title]) => ({ uuid, title })) }));
+    }
+    throw new Error(`Unexpected ${url}`);
+  });
   vi.stubGlobal("fetch", network);
   const ui = (p: string) => createElement(MemoryRouter, { initialEntries: [p] },
-    createElement(Shell, { email: "test@example.invalid", playlists: opts.playlists ?? null, onSignedOut: () => {} }));
+    createElement(Shell, { email: "test@example.invalid", onSignedOut: () => {} }));
   render(ui(path));
-  return { network, setSlots: (...next: string[]) => { slots = next; } };
+  return {
+    network,
+    setSlots: (...next: string[]) => { slots = next; },
+    setPlaylists: (next: ReadonlyMap<string, string> | null) => { playlists = next; },
+    playlistLoads: () => network.mock.calls.filter(([url]) => url === "/api/playlists").length,
+  };
 }
 const names = (list: HTMLElement) => within(list).getAllByRole("link").map(link => link.textContent);
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("wide window: Sidebar", () => {
   it("lists every Destination in render order, with the Bar line where the phone's tab bar ends", async () => {
@@ -129,6 +143,69 @@ describe("layout refresh", () => {
     await act(async () => { window.dispatchEvent(new Event("focus")); });
     expect(names(screen.getByRole("navigation", { name: "Destinations" }))).toContain("Streams");
     void m;
+  });
+});
+
+describe("playlist names", () => {
+  const PL_C = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const focus = () => act(async () => { window.dispatchEvent(new Event("focus")); });
+
+  it("reads them from /api/playlists", async () => {
+    const m = mount("/streams", { playlists: new Map([[PL_A, "New Releases"]]) });
+    expect(names(await screen.findByRole("navigation", { name: "Destinations" }))).toContain("New Releases");
+    expect(m.playlistLoads()).toBe(1);
+  });
+
+  it("shows the generic label for a playlist with an empty title", async () => {
+    mount("/streams", { playlists: new Map([[PL_A, ""]]) });
+    await screen.findByRole("link", { name: "Playlist" });
+  });
+
+  it("reloads them on focus at most every 30 seconds", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const m = mount("/streams", { playlists: new Map([[PL_A, "New Releases"]]) });
+    await screen.findByRole("link", { name: "New Releases" });
+    m.setPlaylists(new Map([[PL_A, "Renamed"]]));
+    await focus();
+    expect(m.playlistLoads()).toBe(1);
+    vi.setSystemTime(Date.now() + 30_000);
+    await focus();
+    await screen.findByRole("link", { name: "Renamed" });
+    expect(m.playlistLoads()).toBe(2);
+  });
+
+  it("reloads them at once when the Layout names a playlist they don't include", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const m = mount("/streams", { playlists: new Map([[PL_A, "New Releases"]]) });
+    await screen.findByRole("link", { name: "New Releases" });
+    // Created on the phone and added to the tab bar since the last load.
+    m.setPlaylists(new Map([[PL_A, "New Releases"], [PL_C, "Tech"]]));
+    m.setSlots("podcasts", `playlist:${PL_C}`, `playlist:${PL_A}`);
+    await focus();
+    await screen.findByRole("link", { name: "Tech" });
+    expect(m.playlistLoads()).toBe(2);
+  });
+
+  it("does not keep reloading for a playlist that stays missing", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const m = mount("/streams", { playlists: new Map([[PL_B, "Other"]]) });
+    await screen.findByRole("navigation", { name: "Destinations" });
+    await act(async () => {});
+    await focus();
+    await focus();
+    expect(m.playlistLoads()).toBe(2);
+    expect(names(screen.getByRole("navigation", { name: "Destinations" }))).not.toContain("Playlist");
+  });
+
+  it("keeps the last names when a reload fails", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const m = mount("/streams", { playlists: new Map([[PL_A, "New Releases"]]) });
+    await screen.findByRole("link", { name: "New Releases" });
+    m.setPlaylists(null);
+    vi.setSystemTime(Date.now() + 30_000);
+    await focus();
+    expect(m.playlistLoads()).toBe(2);
+    expect(screen.getByRole("link", { name: "New Releases" })).toBeTruthy();
   });
 });
 
