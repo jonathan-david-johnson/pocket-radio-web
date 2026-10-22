@@ -4,6 +4,10 @@
 # SUPABASE_SERVICE_ROLE_KEY=replace-with-server-only-service-role-key
 # Anon key for shared tables such as nav_layout (ADR 0002). Server-only; never in the bundle.
 # SUPABASE_ANON_KEY=replace-with-anon-key
+# Optional: read shared tables (nav_layout, curated_stations) from another database, such as the main
+# PocketRadio one, while sessions stay in SUPABASE_URL. Set both; the anon key is that database's own.
+# SHARED_SUPABASE_URL=https://main-project.supabase.co
+# SHARED_SUPABASE_ANON_KEY=replace-with-main-anon-key
 # Optional: production (default, .com) or staging (.net). Must match the phone.
 # PC_API_ENVIRONMENT=production
 # Use separate databases for concurrent production/staging sessions.

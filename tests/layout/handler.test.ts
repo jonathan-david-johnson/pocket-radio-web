@@ -81,4 +81,14 @@ describe("sharedDatabase", () => {
     expect(sharedDatabase({ SUPABASE_URL: "https://u:p@db.example.test/", SUPABASE_ANON_KEY: "k" })).toBeNull();
     expect(sharedDatabase({ SUPABASE_URL: "not a url", SUPABASE_ANON_KEY: "k" })).toBeNull();
   });
+
+  it("reads from the shared database when one is configured, never mixing in the session database's key", () => {
+    const shared = { SHARED_SUPABASE_URL: "https://main.example.test/", SHARED_SUPABASE_ANON_KEY: "main-key" };
+    expect(sharedDatabase({ SUPABASE_URL: "https://db.example.test/", SUPABASE_ANON_KEY: "staging-key", ...shared }))
+      .toEqual({ url: "https://main.example.test", anonKey: "main-key" });
+    // A shared URL without its own key is a misconfiguration, not a reason to send the other key.
+    expect(sharedDatabase({ SUPABASE_URL: "https://db.example.test/", SUPABASE_ANON_KEY: "staging-key", SHARED_SUPABASE_URL: "https://main.example.test/" })).toBeNull();
+    expect(sharedDatabase({ SUPABASE_URL: "https://db.example.test/", SHARED_SUPABASE_ANON_KEY: "main-key" })).toBeNull();
+    expect(sharedDatabase({ SUPABASE_URL: "https://db.example.test/", ...shared, SHARED_SUPABASE_URL: "http://main.example.test/" })).toBeNull();
+  });
 });

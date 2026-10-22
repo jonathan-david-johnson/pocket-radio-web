@@ -20,6 +20,7 @@ const stream = "https://stream.example.org/synthetic.mp3";
 let resolvedStream = stream;
 let stationLookups = 0;
 let outboundCalls = 0;
+const mainCalls = [];
 // Api_UserPlaylistListResponse: "News", then a deleted playlist (is_deleted BoolValue true).
 const pbField = (n, body) => [(n << 3) | 2, body.length, ...body];
 const pbText = s => [...new TextEncoder().encode(s)];
@@ -41,6 +42,18 @@ const outboundService = async request => {
       assert.match(key, /^p_[a-z_]+$/); return `${key} => $${i + 1}`;
     }).join(",");
     return json((await db.query(`select public.${name}(${params}) as value`, Object.values(args))).rows[0].value);
+  }
+  if (url.origin === "https://main.test") {
+    // The shared database: read with its own anon key, never the session database's keys.
+    assert.equal(request.method, "GET");
+    assert.equal(request.headers.get("apikey"), "synthetic-main-anon-key");
+    assert.equal(request.headers.get("authorization"), "Bearer synthetic-main-anon-key");
+    mainCalls.push(url.pathname);
+    if (url.pathname === "/rest/v1/nav_layout") {
+      assert.equal(request.headers.get("x-user-uuid"), user);
+      return json([{ slots: ["podcasts", "streams"], updated_at: "2026-10-01T00:00:00+00:00" }]);
+    }
+    throw new Error("Unexpected shared-database request");
   }
   if (url.href === "https://api.pocketcasts.com/device/authorize") {
     assert.equal(request.method, "POST"); assert.deepEqual(await request.json(), { scope: "tv" });
@@ -69,7 +82,8 @@ const outboundService = async request => {
   }
   throw new Error("Unexpected outbound request: audio and live network are forbidden");
 };
-const bindings = { SUPABASE_URL: "https://database.test", SUPABASE_SERVICE_ROLE_KEY: "synthetic-service-key", SUPABASE_ANON_KEY: "synthetic-anon-key" };
+const bindings = { SUPABASE_URL: "https://database.test", SUPABASE_SERVICE_ROLE_KEY: "synthetic-service-key", SUPABASE_ANON_KEY: "synthetic-anon-key",
+  SHARED_SUPABASE_URL: "https://main.test", SHARED_SUPABASE_ANON_KEY: "synthetic-main-anon-key" };
 const runtime = new Miniflare(convertV4MiniflareOptions({
   host: "127.0.0.1", port: 0,
   workers: [{ name: "web", modules: true, script: await readFile(".wrangler/functions/index.js", "utf8"),
@@ -110,6 +124,10 @@ try {
   const playlists = await call("/api/playlists");
   assert.equal(playlists.status, 200);
   assert.deepEqual(await playlists.json(), { playlists: [{ uuid: "33333333-3333-4333-8333-333333333333", title: "News" }] });
+  const layout = await call("/api/layout");
+  assert.equal(layout.status, 200);
+  assert.deepEqual(await layout.json(), { slots: ["podcasts", "streams"], updated_at: "2026-10-01T00:00:00+00:00" });
+  assert.deepEqual(mainCalls, ["/rest/v1/nav_layout"], "The Layout is read from the shared database, once");
   const playback = await call(`/api/playback?stationId=${station}`);
   assert.equal(playback.status, 200);
   assert.deepEqual(await playback.json(), { stationId: station, streamUrl: stream });
@@ -132,7 +150,7 @@ try {
   for (const path of ["/api/layout", "/api/stations/curated", "/api/playlists"]) assert.equal((await call(path)).status, 401);
   assert.equal(outboundCalls, signedOutAgain, "Signed-out shared-table routes must not reach the database");
   assert.equal((await db.query("select count(*)::int as n from public.pc_tokens")).rows[0].n, 0);
-  console.log("Local Pages: synthetic pairing/reload/signout, HTTPS-only station resolution, no audio fetch/DO binding, input rejection, protobuf playlist list, signed-out 401 on shared-table and account routes and 410 relay tombstones passed; no live network or browser playback.");
+  console.log("Local Pages: synthetic pairing/reload/signout, HTTPS-only station resolution, no audio fetch/DO binding, input rejection, protobuf playlist list, the Layout read from a separate shared database, signed-out 401 on shared-table and account routes and 410 relay tombstones passed; no live network or browser playback.");
 } finally {
   clearTimeout(deadline);
   await runtime.dispose();

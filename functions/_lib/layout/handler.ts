@@ -48,11 +48,22 @@ export function createLayoutHandler(runtime: AuthRuntime, db: SharedDatabase | n
   };
 }
 
-export function sharedDatabase(env: { SUPABASE_URL: string; SUPABASE_ANON_KEY?: string }): SharedDatabase | null {
-  if (!env.SUPABASE_ANON_KEY) return null;
+/**
+ * The database for shared, user-keyed tables. It is the session database unless
+ * `SHARED_SUPABASE_URL` points elsewhere, as on staging, where it names the
+ * main PocketRadio database that the phone writes to. The two settings are not
+ * mixed: a shared URL is used only with its own anon key.
+ */
+export function sharedDatabase(env: {
+  SUPABASE_URL: string; SUPABASE_ANON_KEY?: string; SHARED_SUPABASE_URL?: string; SHARED_SUPABASE_ANON_KEY?: string;
+}): SharedDatabase | null {
+  const separate = env.SHARED_SUPABASE_URL !== undefined || env.SHARED_SUPABASE_ANON_KEY !== undefined;
+  const base = separate ? env.SHARED_SUPABASE_URL : env.SUPABASE_URL;
+  const anonKey = separate ? env.SHARED_SUPABASE_ANON_KEY : env.SUPABASE_ANON_KEY;
+  if (!base || !anonKey) return null;
   try {
-    const url = new URL(env.SUPABASE_URL);
+    const url = new URL(base);
     if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.pathname !== "/") return null;
-    return { url: url.origin, anonKey: env.SUPABASE_ANON_KEY };
+    return { url: url.origin, anonKey };
   } catch { return null; }
 }

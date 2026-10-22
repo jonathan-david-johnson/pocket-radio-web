@@ -21,7 +21,7 @@ const PATTERNS = [
 
 // Server secret values from the environment or an ignored .dev.vars. Their
 // values are compared, never printed.
-const SECRET_NAMES = ["SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "PC_CLIENT_ID", "PC_CLIENT_SECRET"];
+const SECRET_NAMES = ["SUPABASE_ANON_KEY", "SHARED_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "PC_CLIENT_ID", "PC_CLIENT_SECRET"];
 async function secretValues() {
   const values = new Map();
   for (const name of SECRET_NAMES) if (process.env[name]) values.set(name, process.env[name]);
