@@ -38,7 +38,6 @@ Vite hot reload without Functions.
   legacy relay code; they are not evidence of an active relay.
 - `make typecheck`: browser, Functions, retained legacy fixtures and tests.
 - `make build`: browser and Functions bundles only. No Worker dry-run/deployment.
-- `npm run test:legacy-relay`: optional standalone offline historical DO check.
 - `make deploy`: uploads Pages after checks; **requires separate approval**, a
   reviewed explicit target, private access and isolated secrets. Do not run it
   merely because local tests pass.
