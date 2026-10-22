@@ -37,6 +37,11 @@ export async function readJson(response: Response, limit = 32_768): Promise<unkn
     await response.body?.cancel();
     throw new Error("Expected JSON");
   }
+  return JSON.parse(new TextDecoder().decode(await readBytes(response, limit)));
+}
+
+/** Reads a response body, failing once it exceeds `limit` bytes. */
+export async function readBytes(response: Response, limit: number): Promise<Uint8Array> {
   const reader = response.body?.getReader();
   if (!reader) throw new Error("Empty response");
   const chunks: Uint8Array[] = [];
@@ -56,7 +61,7 @@ export async function readJson(response: Response, limit = 32_768): Promise<unkn
   const bytes = new Uint8Array(length);
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-  return JSON.parse(new TextDecoder().decode(bytes));
+  return bytes;
 }
 
 export function createRuntime(env: Env): AuthRuntime {

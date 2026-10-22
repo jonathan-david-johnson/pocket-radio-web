@@ -20,6 +20,13 @@ const stream = "https://stream.example.org/synthetic.mp3";
 let resolvedStream = stream;
 let stationLookups = 0;
 let outboundCalls = 0;
+// Api_UserPlaylistListResponse: "News", then a deleted playlist (is_deleted BoolValue true).
+const pbField = (n, body) => [(n << 3) | 2, body.length, ...body];
+const pbText = s => [...new TextEncoder().encode(s)];
+const playlistListBytes = new Uint8Array([
+  ...pbField(1, [...pbField(1, pbText("33333333-3333-4333-8333-333333333333")), ...pbField(3, pbText("News"))]),
+  ...pbField(1, [...pbField(1, pbText("44444444-4444-4444-8444-444444444444")), ...pbField(2, [0x08, 0x01]), ...pbField(3, pbText("Gone"))]),
+]);
 const json = data => new RuntimeResponse(JSON.stringify(data), { headers: { "Content-Type": "application/json" } });
 const outboundService = async request => {
   outboundCalls++;
@@ -44,6 +51,13 @@ const outboundService = async request => {
     assert.equal(body.device_code, "synthetic-device"); assert.equal(body.scope, "tv");
     return json({ uuid: user, email: "test@example.invalid", token_type: "Bearer", access_token: "synthetic-access",
       refresh_token: "synthetic-refresh", expires_in: 3600 });
+  }
+  if (url.href === "https://api.pocketcasts.com/user/playlist/list") {
+    assert.equal(request.method, "POST");
+    assert.equal(request.headers.get("content-type"), "application/octet-stream");
+    assert.equal(request.headers.get("authorization"), "Bearer synthetic-access");
+    assert.deepEqual([...new Uint8Array(await request.arrayBuffer())], [0x12, 0x06, ...new TextEncoder().encode("mobile")]);
+    return new RuntimeResponse(playlistListBytes, { headers: { "Content-Type": "application/octet-stream" } });
   }
   if (url.href === `https://de1.api.radio-browser.info/json/stations/byuuid/${station}`) {
     assert.equal(request.method, "GET");
@@ -82,7 +96,7 @@ try {
   assert.equal((await call(`/api/playback?stationId=${station}`)).status, 401);
   assert.equal(stationLookups, 0);
   const signedOut = outboundCalls;
-  for (const path of ["/api/layout", "/api/stations/curated"]) assert.equal((await call(path)).status, 401);
+  for (const path of ["/api/layout", "/api/stations/curated", "/api/playlists"]) assert.equal((await call(path)).status, 401);
   assert.equal(outboundCalls, signedOut, "Signed-out shared-table routes must not reach the database");
   const start = await call("/api/pair/start", "POST");
   assert.equal(start.status, 200);
@@ -93,6 +107,9 @@ try {
   assert.deepEqual(await (await call("/api/pair/poll")).json(), { status: "approved" });
   assert.equal(cookies.has("__Host-pr-session"), true);
   assert.deepEqual(await (await call("/api/session")).json(), { signedIn: true, email: "test@example.invalid" });
+  const playlists = await call("/api/playlists");
+  assert.equal(playlists.status, 200);
+  assert.deepEqual(await playlists.json(), { playlists: [{ uuid: "33333333-3333-4333-8333-333333333333", title: "News" }] });
   const playback = await call(`/api/playback?stationId=${station}`);
   assert.equal(playback.status, 200);
   assert.deepEqual(await playback.json(), { stationId: station, streamUrl: stream });
@@ -112,10 +129,10 @@ try {
   assert.deepEqual(await (await call("/api/session")).json(), { signedIn: false });
   assert.equal((await call(`/api/playback?stationId=${station}`)).status, 401);
   const signedOutAgain = outboundCalls;
-  for (const path of ["/api/layout", "/api/stations/curated"]) assert.equal((await call(path)).status, 401);
+  for (const path of ["/api/layout", "/api/stations/curated", "/api/playlists"]) assert.equal((await call(path)).status, 401);
   assert.equal(outboundCalls, signedOutAgain, "Signed-out shared-table routes must not reach the database");
   assert.equal((await db.query("select count(*)::int as n from public.pc_tokens")).rows[0].n, 0);
-  console.log("Local Pages: synthetic pairing/reload/signout, HTTPS-only station resolution, no audio fetch/DO binding, input rejection, signed-out 401 on shared-table routes and 410 relay tombstones passed; no live network or browser playback.");
+  console.log("Local Pages: synthetic pairing/reload/signout, HTTPS-only station resolution, no audio fetch/DO binding, input rejection, protobuf playlist list, signed-out 401 on shared-table and account routes and 410 relay tombstones passed; no live network or browser playback.");
 } finally {
   clearTimeout(deadline);
   await runtime.dispose();

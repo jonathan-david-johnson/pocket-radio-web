@@ -1,4 +1,4 @@
-import { email, object, readJson, seconds, token, uuid, type AuthRuntime } from "./runtime";
+import { email, object, readBytes, readJson, seconds, token, uuid, type AuthRuntime } from "./runtime";
 
 const API_BASES = {
   production: "https://api.pocketcasts.com/",
@@ -41,18 +41,40 @@ export function verifyGrant(value: unknown): VerifiedGrant {
     expiresIn: seconds(field(row, "expires_in", "expiresIn"), 365 * 86400),
   };
 }
-export async function pcRequest(runtime: AuthRuntime, path: string, body: unknown, access?: string): Promise<Response> {
+function upstreamUrl(runtime: AuthRuntime, path: string): string {
   // Defense in depth: no sync writes, arbitrary URL, or arbitrary path even
   // if a future caller bypasses the probe handler's public allowlist.
   if (!ALLOWED_PATHS.has(path)) throw new Error("Unsupported upstream operation");
   const base = API_BASES[runtime.pcApiEnvironment ?? "production"];
   if (!base) throw new Error("Invalid Pocket Casts environment");
-  return runtime.fetch(base + path, {
+  return base + path;
+}
+export async function pcRequest(runtime: AuthRuntime, path: string, body: unknown, access?: string): Promise<Response> {
+  return runtime.fetch(upstreamUrl(runtime, path), {
     method: "POST", redirect: "manual", signal: AbortSignal.timeout(10_000),
     headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": "PocketRadio/1.0",
       ...(access ? { Authorization: `Bearer ${access}` } : {}),
     }, body: JSON.stringify(body),
   });
+}
+
+// Account data is protobuf, as in the iOS and menubar clients (web ADR 0007).
+const PROTOBUF_TYPES = new Set(["application/octet-stream", "application/x-protobuf", "application/protobuf"]);
+/** POSTs a protobuf body and returns the protobuf response bytes; throws on any non-200 or non-protobuf response. */
+export async function pcProtobuf(runtime: AuthRuntime, path: string, body: Uint8Array, access: string, limit: number): Promise<Uint8Array> {
+  const response = await runtime.fetch(upstreamUrl(runtime, path), {
+    method: "POST", redirect: "manual", signal: AbortSignal.timeout(10_000),
+    headers: { "Content-Type": "application/octet-stream", Accept: "application/octet-stream",
+      "User-Agent": "PocketRadio/1.0", Authorization: `Bearer ${access}` },
+    body,
+  });
+  const type = response.headers.get("Content-Type")?.split(";")[0]?.trim().toLowerCase();
+  if (response.status !== 200 || !type || !PROTOBUF_TYPES.has(type)) {
+    await response.body?.cancel();
+    throw new Error("Pocket Casts request failed");
+  }
+  // An empty message encodes as zero bytes, which may arrive with no body.
+  return response.body ? readBytes(response, limit) : new Uint8Array();
 }
 export async function authorize(runtime: AuthRuntime) {
   const response = await pcRequest(runtime, "device/authorize", { scope: SCOPE });
