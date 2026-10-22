@@ -35,7 +35,10 @@ Vite hot reload without Functions.
 - `make test`: unit/UI and SQL contracts, then a real offline Pages runtime
   checking synthetic Pairing, HTTPS station resolution, no server audio fetch,
   HTTP rejection and retired relay routes. Some unit fixtures cover retained
-  legacy relay code; they are not evidence of an active relay.
+  legacy relay code; they are not evidence of an active relay. Last, it builds
+  the browser bundle into a temporary directory and fails if it contains a
+  database key, a Supabase reference, the user id header or a server secret
+  value from the environment or `.dev.vars`.
 - `make typecheck`: browser, Functions, retained legacy fixtures and tests.
 - `make build`: browser and Functions bundles only. No Worker dry-run/deployment.
 - `make deploy`: uploads Pages after checks; **requires separate approval**, a
