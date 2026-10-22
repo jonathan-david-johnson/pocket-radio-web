@@ -1,0 +1,8 @@
+# pnpm reads its settings here; this repo is a single package, not a workspace.
+# Dependency build scripts run only when listed. esbuild and workerd download
+# their platform binary in postinstall. fsevents ships a prebuilt binary, so its
+# node-gyp rebuild is not needed.
+allowBuilds:
+  esbuild: true
+  workerd: true
+  fsevents: false

@@ -14,9 +14,12 @@ is planned for M3. Nothing has been deployed.
 
 ## Local setup
 
-Use Node.js 24 and npm. Health and the page need no credentials.
+Use Node.js 24 and pnpm. Health and the page need no credentials.
+`package.json` pins the pnpm version in `packageManager`; Corepack, which
+ships with Node.js, installs that version.
 
-1. Run `npm ci`.
+1. Run `corepack enable` once per Node.js installation, then
+   `pnpm install --frozen-lockfile`.
 2. Run `make test typecheck build`. Tests use synthetic upstreams and ephemeral
    PostgreSQL/WASM storage; no live credentials or stations are used.
 3. Run `make dev` and open `https://127.0.0.1:8788`. Accept the local development

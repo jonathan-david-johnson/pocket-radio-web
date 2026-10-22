@@ -12,6 +12,10 @@ Read `../AGENTS.md`, `../docs/web/current_milestone.md`, and
 
 - Work on the branch named in the active milestone's location table, in
   `docs/web/current_milestone.md`. Keep the shell on `main`.
+- Use pnpm, pinned in `package.json` `packageManager` and run through
+  Corepack. Do not run npm installs; they would recreate `package-lock.json`.
+  Dependency build scripts run only if `pnpm-workspace.yaml` `allowBuilds`
+  lists them.
 - Each platform command lives in this repo's Makefile. Shell `web-*` targets
   only delegate. Run `make test`, `make typecheck`, and `make build` before
   committing. Test function behavior with injected upstream fetch/storage

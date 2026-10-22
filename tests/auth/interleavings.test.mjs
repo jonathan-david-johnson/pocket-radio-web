@@ -1,5 +1,5 @@
 // Real handlers + ephemeral PostgreSQL/WASM; never a deployed database.
-// Run with npm run test:db; optional module overrides support isolated investigation.
+// Run with pnpm run test:db; optional module overrides support isolated investigation.
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";

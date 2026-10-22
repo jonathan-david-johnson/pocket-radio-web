@@ -1,5 +1,5 @@
 // Standalone, ephemeral PostgreSQL/WASM contract checks; no live database.
-// Run with npm run test:db. AUTH_PGLITE_MODULE optionally selects another installation.
+// Run with pnpm run test:db. AUTH_PGLITE_MODULE optionally selects another installation.
 // Companion interleavings.test.mjs runs the actual auth handlers against this
 // same SQL draft. Its header documents a temporary esbuild bundle; no project
 // dependency/config changes or live database connection are required.
